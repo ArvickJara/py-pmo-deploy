@@ -17,7 +17,7 @@ pdf2image==1.17.0
 
 # Computer Vision
 opencv-python==4.8.1.78
-numpy==1.24.3
+numpy
 matplotlib==3.8.0
 
 # Document Processing
