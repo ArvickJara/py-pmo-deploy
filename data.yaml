@@ -1,0 +1,13 @@
+train: train/images
+val: valid/images
+test: test/images
+
+nc: 1
+names: ['foliacion']
+
+roboflow:
+  workspace: arvic-kenedi-jara-herrera
+  project: foliacionpdf-u6br4
+  version: 2
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/arvic-kenedi-jara-herrera/foliacionpdf-u6br4/dataset/2
