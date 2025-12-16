@@ -108,11 +108,13 @@ if bind_pdf_api:
     
     # También registrar /process-pdf en la raíz para compatibilidad con el frontend
     # que espera https://pmopy.sistemasudh.com/process-pdf
-    from flask import Blueprint
-    root_bp = Blueprint('root_bind_pdf', __name__)
-    root_bp.add_url_rule('/process-pdf', 'process_pdf', bind_pdf_api.bp.view_functions['process_pdf'], methods=['POST'])
-    app.register_blueprint(root_bp)
-    logger.info("Endpoint /process-pdf registrado en la raíz")
+    try:
+        # Importar la función directamente del módulo
+        from modules.bind_pdf.api import process_pdf
+        app.add_url_rule('/process-pdf', 'process_pdf_root', process_pdf, methods=['POST'])
+        logger.info("Endpoint /process-pdf registrado en la raíz")
+    except Exception as e:
+        logger.warning(f"No se pudo registrar /process-pdf en la raíz: {e}")
 
 if admisibilidad_api:
     # Registrar rutas de admisibilidad
