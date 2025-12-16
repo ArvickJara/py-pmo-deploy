@@ -79,10 +79,16 @@ def index():
         'service': 'PMO Python API',
         'version': '1.0.0',
         'endpoints': {
+            'health': '/health',
+            'foliacion': {
+                'process-pdf': '/process-pdf',
+                'description': 'Detección de foliación con YOLO + OCR'
+            },
             'bind-pdf': {
                 'ocr': '/api/bind-pdf/ocr',
                 'merge': '/api/bind-pdf/merge',
-                'process': '/api/bind-pdf/process'
+                'process': '/api/bind-pdf/process',
+                'process-pdf': '/api/bind-pdf/process-pdf'
             },
             'admisibilidad': {
                 'verificar': '/api/admisibilidad/verificar',
@@ -96,9 +102,17 @@ def index():
 # ============================================================================
 
 if bind_pdf_api:
-    # Registrar rutas de bind-pdf
+    # Registrar rutas de bind-pdf con prefijo
     app.register_blueprint(bind_pdf_api.bp, url_prefix='/api/bind-pdf')
     logger.info("Rutas de bind-pdf registradas en /api/bind-pdf")
+    
+    # También registrar /process-pdf en la raíz para compatibilidad con el frontend
+    # que espera https://pmopy.sistemasudh.com/process-pdf
+    from flask import Blueprint
+    root_bp = Blueprint('root_bind_pdf', __name__)
+    root_bp.add_url_rule('/process-pdf', 'process_pdf', bind_pdf_api.bp.view_functions['process_pdf'], methods=['POST'])
+    app.register_blueprint(root_bp)
+    logger.info("Endpoint /process-pdf registrado en la raíz")
 
 if admisibilidad_api:
     # Registrar rutas de admisibilidad
