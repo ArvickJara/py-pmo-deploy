@@ -1,29 +1,35 @@
 # Web Framework
-flask
-flask-cors
-gunicorn
+flask==3.0.0
+flask-cors==4.0.0
+gunicorn==21.2.0
 
 # PDF Processing (bind-pdf)
-inference-sdk
-keras-ocr
-pymupdf
+inference-sdk==0.9.0
+keras-ocr==0.9.0
+pymupdf==1.23.0
 pypdf==3.17.0
 pillow==10.1.0
 
 # OCR (admisibilidad)
 PyPDF2==3.0.1
 pytesseract==0.3.10
-pdf2image
+pdf2image==1.17.0
 
 # Computer Vision
-opencv-python
-numpy
+opencv-python==4.8.1.78
+numpy<2.0.0
 matplotlib==3.8.0
 
 # Document Processing
 reportlab==4.0.7
 language-tool-python==2.7.1
 
-# Utilities
+# Deep Learning (requerido por keras-ocr)
+tensorflow==2.15.0
+
+# Utilidades adicionales
 python-dotenv==1.0.0
 requests==2.31.0
+
+# EasyOCR (opcional pero recomendado)
+easyocr==1.7.0
