@@ -12,12 +12,15 @@ logger = logging.getLogger(__name__)
 # Crear Blueprint
 bp = Blueprint('admisibilidad', __name__)
 
-# Importar funciones del módulo original
+# Importar verificador de admisibilidad
 try:
-    from . import verificador_admisibilidad
-    logger.info("Funciones de admisibilidad importadas correctamente")
+    from .verificador_admisibilidad import VerificadorAdmisibilidad
+    logger.info("VerificadorAdmisibilidad importado correctamente")
+    VERIFICADOR_AVAILABLE = True
 except ImportError as e:
-    logger.error(f"Error importando funciones de admisibilidad: {e}")
+    logger.error(f"Error importando VerificadorAdmisibilidad: {e}")
+    VERIFICADOR_AVAILABLE = False
+    VerificadorAdmisibilidad = None
 
 # ============================================================================
 # ENDPOINTS
@@ -38,11 +41,15 @@ def verificar_documento():
     
     Parámetros:
     - file: archivo PDF (multipart/form-data)
-    - tipo_documento: tipo de documento a verificar
+    - tipo_documento: tipo de documento a verificar (opcional)
+    - config: configuración de verificación (JSON opcional)
     
     Retorna:
     - JSON con resultado de verificación
     """
+    if not VERIFICADOR_AVAILABLE:
+        return jsonify({'error': 'VerificadorAdmisibilidad no disponible'}), 500
+    
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'No se proporcionó archivo'}), 400
@@ -57,33 +64,50 @@ def verificar_documento():
             return jsonify({'error': 'El archivo debe ser PDF'}), 400
         
         # Guardar archivo temporal
-        temp_path = Path('temp') / file.filename
-        temp_path.parent.mkdir(exist_ok=True)
+        temp_dir = Path('temp')
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        temp_path = temp_dir / file.filename
         file.save(str(temp_path))
         
         logger.info(f"Verificando admisibilidad de: {file.filename}")
         
-        # Verificar (implementar según tu lógica original)
-        # resultado = verificador_admisibilidad.verificar(str(temp_path), tipo_documento)
+        # Configuración personalizada si se proporciona
+        config = None
+        if 'config' in request.form:
+            try:
+                import json
+                config = json.loads(request.form.get('config'))
+            except Exception as e:
+                logger.warning(f"Error parseando config: {e}, usando config default")
         
-        # Por ahora retornamos estructura de ejemplo
-        resultado = {
-            'success': True,
-            'filename': file.filename,
-            'tipo_documento': tipo_documento,
-            'admisible': True,
-            'observaciones': [],
-            'message': 'Verificación completa (implementar lógica específica)'
-        }
-        
-        # Limpiar archivo temporal
-        if temp_path.exists():
-            temp_path.unlink()
-        
-        return jsonify(resultado), 200
+        # Ejecutar verificación
+        try:
+            verificador = VerificadorAdmisibilidad(str(temp_path), config=config)
+            resultado_verificacion = verificador.ejecutar_verificacion_completa()
+            
+            # Limpiar archivo temporal
+            if temp_path.exists():
+                temp_path.unlink()
+            
+            return jsonify({
+                'success': True,
+                'filename': file.filename,
+                'tipo_documento': tipo_documento,
+                'resultado': resultado_verificacion
+            }), 200
+            
+        except Exception as e_verif:
+            logger.error(f"Error en verificación: {str(e_verif)}", exc_info=True)
+            # Limpiar archivo temporal en caso de error
+            if temp_path.exists():
+                temp_path.unlink()
+            return jsonify({
+                'success': False,
+                'error': f'Error en verificación: {str(e_verif)}'
+            }), 500
         
     except Exception as e:
-        logger.error(f"Error verificando documento: {str(e)}")
+        logger.error(f"Error verificando documento: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @bp.route('/extraer-datos', methods=['POST'])

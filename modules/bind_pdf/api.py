@@ -4,8 +4,6 @@ Endpoints para procesamiento OCR y unión de PDFs
 """
 from flask import Blueprint, request, jsonify, send_file
 import os
-import sys
-import io
 import logging
 from pathlib import Path
 from typing import List, Dict, Any
@@ -15,44 +13,20 @@ logger = logging.getLogger(__name__)
 # Crear Blueprint
 bp = Blueprint('bind_pdf', __name__)
 
-# Agregar el directorio bind-pdf al path para importar el api.py original
-bind_pdf_path = Path(__file__).parent.parent.parent.parent / 'bind-pdf'
-if bind_pdf_path.exists():
-    sys.path.insert(0, str(bind_pdf_path))
-
-# Importar funciones del módulo original
+# Importar funciones del módulo core
 try:
-    from . import ocr_from_pdf
-    from . import pdf_to_images as pdf_img_module
-    from . import draw_boxes
-    from . import unir_pdfs
-    logger.info("Funciones de bind-pdf importadas correctamente")
+    from . import core
+    logger.info("Módulo core de bind-pdf importado correctamente")
+    
+    # Inicializar el modelo al cargar el módulo
+    try:
+        core.initialize_model()
+        logger.info(f"Modelo {core.MODEL_TYPE} inicializado correctamente")
+    except Exception as e:
+        logger.error(f"Error inicializando modelo: {e}")
 except ImportError as e:
-    logger.error(f"Error importando funciones de bind-pdf: {e}")
-
-# Importar funciones de la API original de bind-pdf
-try:
-    import api as bind_api
-    pdf_to_images = bind_api.pdf_to_images
-    predict_array = bind_api.predict_array
-    compare_foliation = bind_api.compare_foliation
-    enrich_with_ocr = bind_api.enrich_with_ocr
-    _apply_digits_engines = bind_api._apply_digits_engines
-    _normalize_to_digits = bind_api._normalize_to_digits
-    _ensure_empty_ocr_fields = bind_api._ensure_empty_ocr_fields
-    _strip_textual_ocr_fields = bind_api._strip_textual_ocr_fields
-    logger.info("Funciones de detección y OCR importadas correctamente")
-except ImportError as e:
-    logger.warning(f"No se pudieron importar funciones de api.py: {e}")
-    # Funciones dummy si no están disponibles
-    def pdf_to_images(data, dpi=300): return []
-    def predict_array(img, imgsz=512, conf=0.25): return []
-    def compare_foliation(ocr_text, page_num): return {"match": False}
-    def enrich_with_ocr(img, predictions): pass
-    def _apply_digits_engines(img, preds, **kwargs): return []
-    def _normalize_to_digits(text): return ""
-    def _ensure_empty_ocr_fields(preds): pass
-    def _strip_textual_ocr_fields(preds): pass
+    logger.error(f"Error importando módulo core: {e}")
+    core = None
 
 # ============================================================================
 # ENDPOINTS
@@ -222,6 +196,9 @@ def process_pdf():
     Retorna:
     - JSON con resultados por página y resumen
     """
+    if not core:
+        return jsonify({'error': 'Módulo core no disponible'}), 500
+    
     try:
         # Validar archivo
         if 'file' not in request.files:
@@ -252,7 +229,7 @@ def process_pdf():
         
         # Convertir PDF a imágenes
         try:
-            pages = pdf_to_images(pdf_data, dpi=dpi)
+            pages = core.pdf_to_images(pdf_data, dpi=dpi)
         except Exception as e:
             logger.error(f"Error convirtiendo PDF: {str(e)}")
             return jsonify({'error': f'Error al convertir PDF: {str(e)}'}), 500
@@ -263,7 +240,7 @@ def process_pdf():
         for page_num, img in pages:
             try:
                 # Ejecutar detección YOLO
-                predictions = predict_array(img, imgsz=imgsz, conf=conf)
+                predictions = core.predict_array(img, imgsz=imgsz, conf=conf)
                 
                 # Filtrar detecciones de baja confianza
                 for pred in predictions:
@@ -284,7 +261,7 @@ def process_pdf():
                             if pre == "none":
                                 pre = "light"
                             
-                            engine_errors = _apply_digits_engines(
+                            engine_errors = core._apply_digits_engines(
                                 img,
                                 high_conf_predictions,
                                 pad_ratio=pad_ratio,
@@ -298,36 +275,36 @@ def process_pdf():
                             # Fallback a OCR general si no hay dígitos
                             if any(not p.get("ocr_digits") for p in high_conf_predictions):
                                 try:
-                                    enrich_with_ocr(img, high_conf_predictions)
+                                    core.enrich_with_ocr(img, high_conf_predictions)
                                     for p in high_conf_predictions:
                                         if not p.get("ocr_digits"):
-                                            p["ocr_digits"] = _normalize_to_digits(p.get("ocr_text", ""))
+                                            p["ocr_digits"] = core._normalize_to_digits(p.get("ocr_text", ""))
                                 except Exception:
                                     pass
                         except Exception as e_ocr:
                             logger.warning(f"Error en OCR de dígitos: {str(e_ocr)}")
                             try:
-                                enrich_with_ocr(img, high_conf_predictions)
+                                core.enrich_with_ocr(img, high_conf_predictions)
                                 for p in high_conf_predictions:
-                                    p["ocr_digits"] = _normalize_to_digits(p.get("ocr_text", ""))
+                                    p["ocr_digits"] = core._normalize_to_digits(p.get("ocr_text", ""))
                             except Exception:
-                                _ensure_empty_ocr_fields(high_conf_predictions)
+                                core._ensure_empty_ocr_fields(high_conf_predictions)
                                 for p in high_conf_predictions:
                                     p["ocr_digits"] = ""
                         
-                        _strip_textual_ocr_fields(high_conf_predictions)
+                        core._strip_textual_ocr_fields(high_conf_predictions)
                     else:
                         # OCR general (no solo dígitos)
                         try:
-                            enrich_with_ocr(img, high_conf_predictions)
+                            core.enrich_with_ocr(img, high_conf_predictions)
                         except Exception as ocr_err:
-                            _ensure_empty_ocr_fields(high_conf_predictions)
+                            core._ensure_empty_ocr_fields(high_conf_predictions)
                             extra_payload["ocr_error"] = str(ocr_err)
                 
                 # Comparar foliación
                 for pred in predictions:
                     if digits_only and "ocr_digits" in pred:
-                        pred["foliation_check"] = compare_foliation(pred["ocr_digits"], page_num)
+                        pred["foliation_check"] = core.compare_foliation(pred["ocr_digits"], page_num)
                 
                 page_result = {
                     "page_number": page_num,
@@ -385,5 +362,5 @@ def process_pdf():
         }), 200
         
     except Exception as e:
-        logger.error(f"Error en process-pdf: {str(e)}")
+        logger.error(f"Error en process-pdf: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
