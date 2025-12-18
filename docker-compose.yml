@@ -1,0 +1,45 @@
+# Docker Compose para PMO Gore
+version: '3.8'
+
+services:
+  # API Python (bind-pdf + admisibilidad)
+  python-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pmo-python-api
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_ENV=production
+      - FLASK_DEBUG=False
+      - PORT=5001
+      - ROBOFLOW_API_KEY=${ROBOFLOW_API_KEY:-IkzCz5uodkvvJigVmhen}
+      - MODEL_ID=${MODEL_ID:-foliacionpdf-u6br4/2}
+      - UPLOAD_FOLDER=/app/temp
+      - MODEL_PATH=/app/models/yolov8n.pt
+      - TESSERACT_CMD=/usr/bin/tesseract
+    volumes:
+      # Persistir archivos temporales y logs
+      - ./temp:/app/temp
+      - ./logs:/app/logs
+      # Si quieres modificar código en caliente (desarrollo)
+      # - ./app.py:/app/app.py
+      # - ./modules:/app/modules
+    networks:
+      - pmo-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  pmo-network:
+    driver: bridge
+
+volumes:
+  pmo-temp:
+  pmo-logs:

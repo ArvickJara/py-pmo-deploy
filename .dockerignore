@@ -1,0 +1,59 @@
+# Archivos a ignorar en la imagen Docker
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments (no necesarios en Docker)
+venv/
+env/
+ENV/
+.venv/
+
+# Logs (se montarán como volumen)
+logs/
+*.log
+
+# Archivos temporales (se montarán como volumen)
+temp/
+*.tmp
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env.docker
+
+# Documentation
+README.md
+*.md
+
+# Tests
+tests/
+test_*.py
+
+# Deployment files
+docker-compose.yml
+.dockerignore
+
+# Backups
+backups/
+*.tar.gz
+*.zip
+
+# Large files (comentar si necesitas incluirlos)
+# *.pt
